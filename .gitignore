@@ -1,0 +1,12 @@
+# ignore everything in the directory by default
+/*
+
+!.gitignore
+
+!source
+!images
+
+!compile.bat
+
+!README.md
+!LICENSE.md
