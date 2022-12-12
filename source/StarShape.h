@@ -1,20 +1,34 @@
-#pragma once
+#ifndef STARSHAPE_H
+#define STARSHAPE_H
 
+#include "rng.h"
+#include "config.h"
+#include "constants.h"
+#include "enums.h"
 #include "Shape.h"
 
-using namespace std;
+extern struct RNG rng;
+extern struct Config cfg;
 
 struct StarShape : Shape {
+    using Core = Enum::Star::Shape::Core;
+    using Draw = Enum::Star::Shape::Draw;
+
     int tips;
     double iRadius;
     double oRadius;
-    int styleCore;
-    int styleDraw;
 
-    StarShape(int &, double &, double &, int, int);
-    void define();
-    void fillCore();
-    void hollowCore();
+    struct Style {
+        Core core;
+        Draw draw;
+    } style;
+
+    StarShape(int&, double&, double&);
+
+    void fullCore();
+    void emptyCore();
     void fillDraw();
     void lineDraw();
 };
+
+#endif

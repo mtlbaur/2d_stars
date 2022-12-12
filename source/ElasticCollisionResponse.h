@@ -20,12 +20,12 @@ One requirement listed by the "human-readable summary" of this license states:
 
 Consequently, the code in this elasticCollisionResponse() function is also licensed under Creative Commons Attribution-ShareAlike License 3.0.
 */
-inline void elasticCollisionResponse(double &a_x, double &a_y, double &b_x, double &b_y,
-                                     double &a_x_vel, double &a_y_vel, double &b_x_vel, double &b_y_vel,
-                                     double &a_mass, double &b_mass) {
+inline void elasticCollisionResponse(double a_x, double a_y, double b_x, double b_y,
+                                     double& a_x_vel, double& a_y_vel, double& b_x_vel, double& b_y_vel,
+                                     double a_mass, double b_mass) {
     double x_temp = a_x - b_x;
     double y_temp = a_y - b_y;
-    double temp = 2.0 / (a_mass + b_mass) *
+    double temp   = 2.0 / (a_mass + b_mass) *
                   (((a_x_vel - b_x_vel) * x_temp + (a_y_vel - b_y_vel) * y_temp) /
                    (pow(x_temp, 2) + pow(y_temp, 2)));
 

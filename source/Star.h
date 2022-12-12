@@ -1,39 +1,91 @@
-#pragma once
+#ifndef STAR_H
+#define STAR_H
 
-// #include <iostream>
-// #include <iomanip>
+#include <random>
+#include <memory>
 
-#include "DrawableObject.h"
+#include <glad/gl.h>
+#include <GLFW/glfw3.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#include "rng.h"
+#include "constants.h"
+#include "enums.h"
+#include "window.h"
+#include "config.h"
+#include "Shader.h"
 #include "StarShape.h"
 #include "OverlapCorrection.h"
 #include "ElasticCollisionResponse.h"
 
-using namespace std;
+extern struct RNG rng;
+extern struct Config cfg;
+extern struct Windows win;
+extern double frameTime;
 
-enum GenType {
-    RNG = 0,
-    MIN = 1,
-    AVG = 2,
-    MAX = 3
-};
+struct Star {
+    double x;
+    double y;
+    double xVel; // pixels per second
+    double yVel;
+    double ang;
+    double angVel; // radians per second
+    double density;
 
-struct Star : DrawableObject {
     int tips;
     double iRadius;
     double oRadius;
     double aRadius;
 
-    Star(GenType);
-    ~Star();
+    double area;
+    double mass;
+    double speed;
+
+    // These are floating-point types to allow smooth, FPS-independent color transitions.
+    // They are truncated to int on use.
+    double indexRandomRGBColors = 0.0;
+    static double indexUniformRGBColors;
+    double indexConsistentRGBColors = 0.0;
+
+    bool notCollided = true;
+
+    std::unique_ptr<Color> color;
+    std::unique_ptr<Shader> shader;
+    std::unique_ptr<Shape> shape;
+
+    static std::vector<Color> RGBColors;
+    static glm::mat4 projection;
+
+    Star(Enum::Star::GenType);
 
     void update();
+    void xUpdate();
+    void yUpdate();
+    void angUpdate();
+    void gravityUpdate();
+
     void draw();
+    void forceMove();
+
+    void computeMass();
     void computeArea();
+    void computeSpeed();
     void computeAverageRadius();
+
     void reflectLeft();
     void reflectRight();
     void reflectTop();
     void reflectBottom();
 
-    static bool collision(Star*, Star*);
+    static void prepareProjection(int, int);
+
+    static void updateIndexUniformRGBColors();
+    static void clampIndexRGBColors(double&, int);
+
+    static bool collision(Star&, Star&);
 };
+
+#endif

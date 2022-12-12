@@ -1,11 +1,8 @@
-#pragma once
+#ifndef SHADER_H
+#define SHADER_H
 
-// #include <iostream>
-// #include <iomanip>
-
+#include <iostream>
 #include "Shape.h"
-
-using namespace std;
 
 constexpr char vertexSource[] =
     R"(#version 460 core
@@ -27,17 +24,17 @@ constexpr char fragmentSource[] =
         outColor = uniColor;
     };)";
 
-struct ShaderProperties {
-    unsigned int program = 0;
-    unsigned int vertexBuffer = 0;
-    unsigned int indexBuffer = 0;
-    unsigned int vertexArray = 0;
+struct Shader {
+    unsigned program      = 0;
+    unsigned vertexBuffer = 0;
+    unsigned indexBuffer  = 0;
+    unsigned vertexArray  = 0;
+
+    Shader(Shape&);
+    ~Shader();
+    void activate() const;
+    static void deactivate();
+    void createProgram();
 };
 
-namespace Shader {
-    void create(ShaderProperties &, Shape &);
-    void destroy(ShaderProperties &);
-    void activate(ShaderProperties &);
-    void deactivate(ShaderProperties &);
-    void createProgram(ShaderProperties &);
-}
+#endif

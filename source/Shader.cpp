@@ -1,26 +1,20 @@
 #include "Shader.h"
 
-void Shader::create(ShaderProperties &p, Shape &s) {
-    glGenBuffers(1, &p.vertexBuffer);
-    glGenBuffers(1, &p.indexBuffer);
-    glGenVertexArrays(1, &p.vertexArray);
+Shader::Shader(Shape& s) {
+    glGenBuffers(1, &vertexBuffer);
+    glGenBuffers(1, &indexBuffer);
+    glGenVertexArrays(1, &vertexArray);
 
-    // for (unsigned int i = 0; i < s.verticesSize; i += 2)
-    //     cout << fixed << "(" << s.vertices[i] << ", " << s.vertices[i + 1] << ")" << endl;
-    // for (unsigned int i = 0; i < s.indicesSize; i += 3)
-    //     cout << fixed << "(" << s.indices[i] << ", " << s.indices[i + 1] << ", " << s.indices[i + 2] << ")" << endl;
-    // cout << "----" << endl;
-
-    Shader::createProgram(p);
+    createProgram();
 
     // the following indented lines contain settings that are stored in the VertexArrayObject
     // clang-format off
-    glBindVertexArray(p.vertexArray);
-        glBindBuffer(GL_ARRAY_BUFFER, p.vertexBuffer);
+    glBindVertexArray(vertexArray);
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
         glBufferData(GL_ARRAY_BUFFER, s.verticesSize * sizeof(float), s.vertices.get(), GL_STATIC_DRAW);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p.indexBuffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, s.indicesSize * sizeof(unsigned int), s.indices.get(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, s.indicesSize * sizeof(unsigned), s.indices.get(), GL_STATIC_DRAW);
 
         glVertexAttribPointer(s.args_vap.index, s.args_vap.size, s.args_vap.type, s.args_vap.normalized, s.args_vap.stride, s.args_vap.pointer);
         glEnableVertexAttribArray(s.args_vap.index);
@@ -33,34 +27,35 @@ void Shader::create(ShaderProperties &p, Shape &s) {
     // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void Shader::destroy(ShaderProperties &p) {
-    glDeleteProgram(p.program);
+Shader::~Shader() {
+    glDeleteProgram(program);
 
-    glDeleteVertexArrays(1, &p.vertexArray);
+    glDeleteVertexArrays(1, &vertexArray);
 
     // necessary?
-    glInvalidateBufferData(p.vertexBuffer);
-    glInvalidateBufferData(p.indexBuffer);
+    // glInvalidateBufferData(vertexBuffer);
+    // glInvalidateBufferData(indexBuffer);
 
-    glDeleteBuffers(1, &p.vertexBuffer);
-    glDeleteBuffers(1, &p.indexBuffer);
+    glDeleteBuffers(1, &vertexBuffer);
+    glDeleteBuffers(1, &indexBuffer);
 }
 
-void Shader::activate(ShaderProperties &p) {
-    glUseProgram(p.program);
-    glBindVertexArray(p.vertexArray);
+void Shader::activate() const {
+    glUseProgram(program);
+    glBindVertexArray(vertexArray);
 }
 
-void Shader::deactivate(ShaderProperties &p) {
+void Shader::deactivate() {
     glBindVertexArray(0);
     glUseProgram(0);
 }
 
-void Shader::createProgram(ShaderProperties &p) {
-    unsigned int vertexShader, fragmentShader;
+void Shader::createProgram() {
+    unsigned vertexShader, fragmentShader;
 
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
     {
+        vertexShader = glCreateShader(GL_VERTEX_SHADER);
+
         int compiled;
         const char* sourcePtr = vertexSource;
 
@@ -77,12 +72,13 @@ void Shader::createProgram(ShaderProperties &p) {
             char log[logLength];
             glGetShaderInfoLog(vertexShader, logLength, NULL, log);
 
-            fprintf(stderr, "ERROR: Shader::createProgram(): VERTEX: COMPILE_FAILURE:\n%s\n", log);
+            std::cerr << "ERROR: Shader::createProgram(): VERTEX: COMPILE_FAILURE:\n"
+                      << log << '\n';
         };
     }
-
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     {
+        fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+
         int compiled;
         const char* sourcePtr = fragmentSource;
 
@@ -99,29 +95,31 @@ void Shader::createProgram(ShaderProperties &p) {
             char log[logLength];
             glGetShaderInfoLog(fragmentShader, logLength, NULL, log);
 
-            fprintf(stderr, "ERROR: Shader::createProgram(): FRAGMENT: COMPILE_FAILURE:\n%s\n", log);
+            std::cerr << "ERROR: Shader::createProgram(): FRAGMENT: COMPILE_FAILURE:\n"
+                      << log << '\n';
         };
     }
-
-    p.program = glCreateProgram();
     {
+        program = glCreateProgram();
+
         int linked;
 
-        glAttachShader(p.program, vertexShader);
-        glAttachShader(p.program, fragmentShader);
-        glLinkProgram(p.program);
-        glGetProgramiv(p.program, GL_LINK_STATUS, &linked);
+        glAttachShader(program, vertexShader);
+        glAttachShader(program, fragmentShader);
+        glLinkProgram(program);
+        glGetProgramiv(program, GL_LINK_STATUS, &linked);
 
         if (!linked) {
             int logLength;
-            glGetProgramiv(p.program, GL_INFO_LOG_LENGTH, &logLength);
+            glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
 
             if (logLength < 1) logLength = 1;
 
             char log[logLength];
-            glGetProgramInfoLog(p.program, logLength, NULL, log);
+            glGetProgramInfoLog(program, logLength, NULL, log);
 
-            fprintf(stderr, "ERROR: Shader::createProgram(): PROGRAM: LINK_FAILURE:\n%s\n", log);
+            std::cerr << "ERROR: Shader::createProgram(): PROGRAM: LINK_FAILURE:\n"
+                      << log << '\n';
         }
     }
 

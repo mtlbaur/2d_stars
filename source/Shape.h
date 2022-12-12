@@ -1,20 +1,16 @@
-#pragma once
+#ifndef SHAPE_H
+#define SHAPE_H
 
 #include <memory>
-#include <cmath>
 
 #include <glad/gl.h>
 
-#include "MathConstants.h"
-
-using namespace std;
-
 struct Shape {
-    unsigned int verticesSize;
-    unique_ptr<float[]> vertices;
+    unsigned verticesSize;
+    std::unique_ptr<float[]> vertices;
 
-    unsigned int indicesSize;
-    unique_ptr<unsigned int[]> indices;
+    unsigned indicesSize;
+    std::unique_ptr<unsigned[]> indices;
 
     // https://docs.gl/gl4/glVertexAttribPointer
     struct args_glVertexAttribPointer {
@@ -34,3 +30,5 @@ struct Shape {
         const void* indices;
     } args_de;
 };
+
+#endif

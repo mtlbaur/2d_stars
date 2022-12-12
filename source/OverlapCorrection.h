@@ -68,9 +68,9 @@ Mathematical steps:
 
 The code in the following overlapCorrection() function is a condensed version of the above mathematical steps.
 */
-inline void overlapCorrection(double &a_x, double &a_y, double &b_x, double &b_y,
-                              double &radii, double &distance) {
-    double scalar = (radii - distance) / 2 / distance;
+inline void overlapCorrection(double& a_x, double& a_y, double& b_x, double& b_y,
+                              double radii, double distance) {
+    double scalar             = (radii - distance) / 2 / distance;
     double x_component_scaled = (a_x - b_x) * scalar;
     double y_component_scaled = (a_y - b_y) * scalar;
 

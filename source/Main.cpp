@@ -1,12 +1,5 @@
-// #include <iostream>
-// #include <iomanip>
-
-// #include <algorithm>
-// #include <memory>
-// #include <cmath>
-
-#include <chrono>
-#include <random>
+#include <iostream>
+#include <memory>
 #include <charconv>
 
 // https://www.boost.org/doc/libs/1_79_0/libs/filesystem/doc/tutorial.html
@@ -25,31 +18,31 @@
 
 #include "Star.h"
 
-using namespace std;
-
-const int SCREEN_SIZE_X = 1920;
-const int SCREEN_SIZE_Y = 1080;
+const int SCREEN_SIZE_X       = 1920;
+const int SCREEN_SIZE_Y       = 1080;
 const double SCREEN_SIZE_MULT = 0.75;
+
 const int GLFW_CONTEXT_VER_MAJOR = 4;
 const int GLFW_CONTEXT_VER_MINOR = 6;
-const char* GLSL_VER = "#version 130";
+
+const char GLSL_VER[] = "#version 130";
+
+const int MSAA_SAMPLES = 4;
+
 // If FPS goes lower than 30, don't attempt to keep star movement/physics consistent anymore.
 // This also prevents long program pauses (== high frameTime values) from causing excessively incorrect behavior (e.g. stars teleporting).
 // The drawback is slowdown when FPS falls below 30.
 const double FRAME_TIME_MAX = 1.0 / 30.0;
-const int MSAA_SAMPLES = 4;
-const unsigned int MAX_STARS = 5000;
+const int MAX_STARS         = 8000;
 
-// config files path information
-static const char CFG_PATH_USER[] = "./config/user/";
-static const char CFG_PATH_DEFAULT[] = "./config/default/";
-static const char CFG_EXTENSION[] = ".cfg";
-static const char CFG_NAME_DEFAULT[] = "parameters";
+const std::string PATH_SYSTEM = "./config/system/";
+const std::string PATH_USER   = "./config/user/";
+const std::string EXT_DEFAULT = ".cfg";
 
 // https://docs.gl/gl4/glBlendFunc
 // Used to allow the user to pick whatever blending combination they want.
 // Note that a lot of combinations will result in useless blending (invisible stars is one example).
-static const int glBlendFunc_factor[] = {
+const int glBlendFunc_factor[] = {
     GL_ZERO,
     GL_ONE,
     GL_SRC_COLOR,
@@ -72,7 +65,7 @@ static const int glBlendFunc_factor[] = {
 
 #define GET_NAME(x) #x
 
-static const char* glBlendFunc_factor_name[] = {
+const char* const glBlendFunc_factor_name[] = {
     GET_NAME(GL_ZERO),
     GET_NAME(GL_ONE),
     GET_NAME(GL_SRC_COLOR),
@@ -95,47 +88,44 @@ static const char* glBlendFunc_factor_name[] = {
 
 #undef GET_NAME
 
+// contains all stars that appear on the main window
+static std::vector<std::unique_ptr<Star>> stars;
+
+// contains stars used in the preview of the config window
+static struct PreviewStars {
+    std::unique_ptr<Star> min;
+    std::unique_ptr<Star> avg;
+    std::unique_ptr<Star> max;
+
+    void forceVisible() const {
+        if (min && avg && max) {
+            min->color->assign(0.0f, 1.0f, 1.0f, 1.0f);
+            avg->color->assign(1.0f, 1.0f, 0.0f, 1.0f);
+            max->color->assign(1.0f, 0.0f, 1.0f, 1.0f);
+        }
+    }
+} pre;
+
+// title of the main window
+static struct MainWinTitle {
+    char data[21] = "    " // space to fill with star count
+                    " stars; "
+                    "    " // space to fill with FPS count
+                    " FPS";
+    const int countL = 0;
+    const int countR = 3;
+    const int fpsL   = countR + 1 + 8;
+    const int fpsR   = fpsL + 3;
+} mainWinTitle;
+
+// global struct: used to generate random values
+RNG rng;
 // global struct: contains various user-controlled settings
 Config cfg;
 // global struct: contains properties GLFW and ImGui windows
 Windows win;
 // global var: contains frame time used as a multiplier to make stars appear to move at the same speed regardless of FPS
 double frameTime = 0.0;
-// global var: used to generate random values
-default_random_engine dre;
-
-// contains all stars that appear on the main window
-static vector<unique_ptr<Star>> stars;
-// contains stars used in the preview of the config window
-static struct {
-    unique_ptr<Star> min;
-    unique_ptr<Star> avg;
-    unique_ptr<Star> max;
-
-    void forceVisible() {
-        if (min && avg && max) {
-            min->color = Color(0.0f, 1.0f, 1.0f, 1.0f);
-            avg->color = Color(1.0f, 1.0f, 0.0f, 1.0f);
-            max->color = Color(1.0f, 0.0f, 1.0f, 1.0f);
-        }
-    }
-} pre;
-
-// config files
-static vector<boost::filesystem::directory_entry> cfgFiles;
-// config file name max length
-static const unsigned int cfgFileNameBufferSize = 128;
-// config file name characters
-static char cfgFileNameBuffer[cfgFileNameBufferSize] = "";
-// contains name of last used config (displayed in GUI)
-static string cfgLastUsed = "";
-// how many consecutive chars of space is available in mainWinTitle (filled with to_char)
-static const int mainWinTitleSpace = 4;
-// title of the main window
-static char mainWinTitle[] = "    " // space to fill with star count
-                             " stars; "
-                             "    " // space to fill with FPS count
-                             " FPS";
 
 // main loop
 
@@ -144,7 +134,7 @@ void execute();
 // Star
 
 void addRemoveStars(int);
-void regenStars(unsigned int);
+void regenStars();
 void updateStars();
 
 // ImGui creation
@@ -183,21 +173,19 @@ void cfgWinCloseCallback(GLFWwindow*);
 
 // utility
 
-void getCfgFiles(vector<boost::filesystem::directory_entry> &);
 int cfgNameImGuiInputTextFilter(ImGuiInputTextCallbackData*);
 
 int main() {
-    dre.seed(std::chrono::system_clock::now().time_since_epoch().count());
     stars.reserve(MAX_STARS);
 
     glfwSetErrorCallback(errorCallback);
 
     if (!glfwInit()) {
-        fprintf(stderr, "glfwInit() failed");
+        std::cerr << "glfwInit(): failed\n";
         exit(1);
     }
 
-    cfg.load(CFG_PATH_DEFAULT, CFG_NAME_DEFAULT, CFG_EXTENSION, &cfgLastUsed);
+    cfg.load(PATH_SYSTEM, "data", EXT_DEFAULT);
 
     createMainWin();
     createCfgWin();
@@ -210,18 +198,16 @@ int main() {
 
     glfwTerminate();
 
-    cfg.save(CFG_PATH_DEFAULT, CFG_NAME_DEFAULT, CFG_EXTENSION);
-
-    return 0;
+    cfg.save(PATH_SYSTEM, "data", EXT_DEFAULT);
 }
 
 void execute() {
-    chrono::steady_clock::time_point updateTime = chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point updateTime = std::chrono::steady_clock::now();
 
     while (!glfwWindowShouldClose(win.main.glfw)) {
-        chrono::steady_clock::time_point currentTime = chrono::steady_clock::now();
-        chrono::duration<double> deltaTime = currentTime - updateTime; // seconds
-        double targetSecondsPerFrame = 1.0 / (double)cfg.targetFPS;
+        std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
+        std::chrono::duration<double> deltaTime           = currentTime - updateTime; // seconds
+        double targetSecondsPerFrame                      = 1.0 / (double)cfg.targetFPS;
 
         if (deltaTime.count() >= targetSecondsPerFrame) {
             updateTime = currentTime;
@@ -244,10 +230,10 @@ void execute() {
 
             setMainWinTitle();
 
-            frameTime = min(frameTime, FRAME_TIME_MAX);
+            frameTime = std::min(frameTime, FRAME_TIME_MAX);
 
             // update and draw in OpenGL
-            DrawableObject::prepareProjection(win.main.w, win.main.h);
+            Star::prepareProjection(win.main.w, win.main.h);
             updateStars();
 
             glfwSwapBuffers(win.main.glfw);
@@ -290,23 +276,25 @@ void addRemoveStars(int n) {
     glfwMakeContextCurrent(win.main.glfw);
 
     if (n > 0) {
-        if (stars.size() + n > MAX_STARS) n = MAX_STARS - stars.size();
+        n = std::min(n, MAX_STARS - static_cast<int>(stars.size()));
 
-        for (int i = 0; i < n; i++) {
-            stars.push_back(make_unique<Star>(RNG));
+        for (; n > 0; n--) {
+            stars.emplace_back(std::make_unique<Star>(Enum::Star::GenType::RNG));
         }
     } else if (n < 0) {
-        for (unsigned int i = ((unsigned int)-n < stars.size() ? -n : stars.size()); i > 0; i--) {
+        for (; !stars.empty() && n < 0; n++) {
             stars.pop_back();
         }
     }
 }
 
-void regenStars(unsigned int n) {
-    if (n == 0) return;
+void regenStars() {
+    if (stars.empty()) return;
 
     glfwMakeContextCurrent(NULL);
     glfwMakeContextCurrent(win.main.glfw);
+
+    int n = stars.size();
 
     addRemoveStars(-n);
     addRemoveStars(n);
@@ -317,70 +305,64 @@ void regenStars(unsigned int n) {
 
 void updateStars() {
     if (cfg.collisions) {
-        bool ithStarNotCollided;
-
+        for (const std::unique_ptr<Star>& s : stars) {
+            s->update();
+            s->notCollided = true;
+        }
         for (unsigned i = 0; i < stars.size(); i++) {
-            if (stars[i]->notUpdated) {
-                stars[i]->update();
-                stars[i]->notUpdated = false;
-            }
-
-            ithStarNotCollided = true;
-
-            for (unsigned j = i + 1; j < stars.size(); j++) {
-                if (stars[i]->notUpdated) {
-                    stars[i]->update();
-                    stars[i]->notUpdated = false;
-                }
-
-                if (stars[i]->notCollided && stars[i]->notCollided && Star::collision(stars.at(i).get(), stars.at(j).get())) {
-                    ithStarNotCollided = false;
-                    break;
+            if (stars[i]->notCollided) {
+                for (unsigned j = i + 1; j < stars.size(); j++) {
+                    if (stars[j]->notCollided && Star::collision(*stars[i], *stars[j])) {
+                        stars[j]->notCollided = false;
+                        break;
+                    }
                 }
             }
-
-            stars[i]->notUpdated = true;
-            stars[i]->notCollided = ithStarNotCollided;
             stars[i]->draw();
         }
     } else {
-        for (unsigned i = 0; i < stars.size(); i++) {
-            stars[i]->update();
-            stars[i]->draw();
+        for (const std::unique_ptr<Star>& s : stars) {
+            s->update();
+            s->draw();
         }
     }
-
-    DrawableObject::updateIndexUniformRGBColors();
+    Star::updateIndexUniformRGBColors();
 }
 
 // ImGui creation
 
 void createGUI() {
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
-                             ImGuiWindowFlags_NoMove |
-                             ImGuiWindowFlags_NoResize |
-                             ImGuiWindowFlags_NoCollapse |
-                             ImGuiWindowFlags_HorizontalScrollbar;
+    static const ImGuiWindowFlags WF = ImGuiWindowFlags_NoTitleBar |
+                                       ImGuiWindowFlags_NoMove |
+                                       ImGuiWindowFlags_NoResize |
+                                       ImGuiWindowFlags_NoCollapse |
+                                       ImGuiWindowFlags_HorizontalScrollbar;
+    static const ImGuiSliderFlags SF = ImGuiSliderFlags_NoRoundToFormat |
+                                       ImGuiSliderFlags_AlwaysClamp;
+    static const char IF[] = "%d";   // int format
+    static const char FF[] = "%.3f"; // float format
+    static const double S  = 1000.0; // steps
 
-    const char* intFormat = "%d";
-    const char* floatFormat = "%.3f";
-
-    if (ImGui::Begin("Config", NULL, flags)) {
+    if (ImGui::Begin("Config", NULL, WF)) {
         if (ImGui::CollapsingHeader("Stars")) {
-            ImGui::SliderInt("##addRemoveStars", &cfg.addRemove, -500, 500);
+            ImGui::DragInt("##addRemoveStars", &cfg.addRemove, 500.0 / S, -500, 500, IF, SF);
 
-            unsigned int amount = 0;
-
-            ImGui::SameLine();
-            if (ImGui::Button("+-#")) amount += cfg.addRemove;
-
-            if (ImGui::Button("+1")) amount += 1;
+            int amount = 0;
 
             ImGui::SameLine();
-            if (ImGui::Button("-1")) amount += -1;
+            if (ImGui::Button("+-"))
+                amount += cfg.addRemove;
+
+            if (ImGui::Button("+1"))
+                amount++;
 
             ImGui::SameLine();
-            if (ImGui::Button("Clear")) amount += -stars.size();
+            if (ImGui::Button("-1"))
+                amount--;
+
+            ImGui::SameLine();
+            if (ImGui::Button("Clear"))
+                amount += -stars.size();
 
             if (amount != 0) {
                 addRemoveStars(amount);
@@ -407,17 +389,13 @@ void createGUI() {
 
                 glBlendFunc(glBlendFunc_factor[cfg.srcBlendMode], glBlendFunc_factor[cfg.dstBlendMode]);
 
-                // cout << glBlendFunc_factor[cfg.srcBlendMode] << ": " << glBlendFunc_factor_name[cfg.srcBlendMode] << endl
-                //      << glBlendFunc_factor[cfg.dstBlendMode] << ": " << glBlendFunc_factor_name[cfg.dstBlendMode] << endl
-                //      << endl;
-
                 glfwMakeContextCurrent(NULL);
                 glfwMakeContextCurrent(win.cfg.glfw);
             }
 
             ImGui::Separator();
             ImGui::Combo("Color Mode", &cfg.colorMode, "Default\0Random\0Uniform\0Consistent\0");
-            ImGui::SliderFloat("Color Shift Mult", &cfg.colorShiftMult, -1000, 1000, floatFormat, ImGuiSliderFlags_NoRoundToFormat);
+            ImGui::DragFloat("Color Shift Mult", &cfg.colorShiftMult, 1000.0f / S, -1000.0f, 1000.0f, FF, SF);
 
             ImGui::Separator();
             ImGui::ColorEdit4("Background Color", (float*)&cfg.backgroundColor);
@@ -426,150 +404,134 @@ void createGUI() {
             ImGui::Checkbox("Collisions", &cfg.collisions);
 
             ImGui::Separator();
-            ImGui::SliderFloat("##gravityMult", &cfg.gravityMult, -10000, 10000, floatFormat, ImGuiSliderFlags_NoRoundToFormat);
+            ImGui::DragFloat("##gravityVal", &cfg.gravityVal, 100.0f / S, -100.0f, 100.0f, FF, SF);
 
             ImGui::SameLine();
             ImGui::Checkbox("Gravity", &cfg.gravity);
 
             ImGui::Separator();
-            ImGui::SliderFloat("##accelMult", &cfg.accelMult, 0, 2, "%.6f", ImGuiSliderFlags_NoRoundToFormat | ImGuiSliderFlags_AlwaysClamp);
+            ImGui::DragFloat("##accelMult", &cfg.accelMult, 2.0f / S, 0.0f, 2.0f, FF, SF);
 
             ImGui::SameLine();
             ImGui::Checkbox("Accel", &cfg.accel);
 
-            ImGui::Separator();
-            ImGui::SliderFloat("##minSpeedLimit", &cfg.minSpeedLimit, 0, cfg.maxSpeedLimit, floatFormat, ImGuiSliderFlags_NoRoundToFormat | ImGuiSliderFlags_AlwaysClamp);
+            ImGui::DragFloatRange2("Speed Limit", &cfg.minSpeedLimit, &cfg.maxSpeedLimit, 1000.0f / S, 0.0f, 1000.0f, FF, FF, SF);
 
             ImGui::SameLine();
-            ImGui::Checkbox("Min Speed", &cfg.minSpeed);
-
-            ImGui::Separator();
-            ImGui::SliderFloat("##maxSpeedLimit", &cfg.maxSpeedLimit, cfg.minSpeedLimit, 1000, floatFormat, ImGuiSliderFlags_NoRoundToFormat | ImGuiSliderFlags_AlwaysClamp);
+            ImGui::Checkbox("Min", &cfg.minSpeed);
 
             ImGui::SameLine();
-            ImGui::Checkbox("Max Speed", &cfg.maxSpeed);
+            ImGui::Checkbox("Max", &cfg.maxSpeed);
         }
         if (ImGui::CollapsingHeader("Parameters")) {
             if (ImGui::Button("Apply")) {
-                regenStars(stars.size());
+                regenStars();
 
                 glfwMakeContextCurrent(NULL);
                 glfwMakeContextCurrent(win.cfg.glfw);
             }
 
             ImGui::SameLine();
-            if (ImGui::Button("Save")) {
-                getCfgFiles(cfgFiles);
-                ImGui::OpenPopup("Save Config");
+            if (ImGui::Button("Save/Load")) {
+                cfg.files.load(PATH_USER, EXT_DEFAULT);
+                ImGui::OpenPopup("Save/Load Config");
             }
-
-            int count = cfgFiles.size();
-
-            // BEGIN SAVE POPUP
-            bool p_open_save = true;
-
-            if (ImGui::BeginPopupModal("Save Config", &p_open_save, ImGuiWindowFlags_AlwaysAutoResize)) {
-                static unsigned int cfgSaveSelectedIdx = 0;
-
-                if (ImGui::BeginListBox("##fileNames")) {
-                    for (unsigned int i = 0; i < cfgFiles.size(); i++) {
-                        count -= 1;
-
-                        const bool selected = (cfgSaveSelectedIdx == i);
-
-                        if (ImGui::Selectable(cfgFiles[i].path().stem().string().c_str(), selected)) {
-                            cfgSaveSelectedIdx = i;
-                            memcpy(cfgFileNameBuffer, cfgFiles[i].path().stem().string().c_str(), cfgFileNameBufferSize);
-                        }
-
-                        if (selected) ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndListBox();
-                }
-
-                bool save = ImGui::Button("Save");
-
-                ImGui::SameLine();
-                ImGui::InputText("Name", cfgFileNameBuffer, cfgFileNameBufferSize, ImGuiInputTextFlags_CallbackCharFilter, cfgNameImGuiInputTextFilter);
-
-                if (save) {
-                    ImGui::CloseCurrentPopup();
-                    cfg.save(CFG_PATH_USER, cfgFileNameBuffer, CFG_EXTENSION, &cfgLastUsed);
-                    memset(cfgFileNameBuffer, '\0', cfgFileNameBufferSize);
-                    getCfgFiles(cfgFiles);
-                }
-
-                if (ImGui::Button("Delete") && cfgFiles.size() > 0 && cfgSaveSelectedIdx < cfgFiles.size()) {
-                    boost::filesystem::remove(cfgFiles[cfgSaveSelectedIdx].path());
-                    cfgSaveSelectedIdx = 0;
-                    getCfgFiles(cfgFiles);
-                }
-
-                ImGui::EndPopup();
-            }
-            // END SAVE POPUP
 
             bool reloadPreview = false;
 
-            ImGui::SameLine();
-            if (ImGui::Button("Load")) {
-                getCfgFiles(cfgFiles);
-                ImGui::OpenPopup("Load Config");
-            }
+            // BEGIN SAVE/LOAD POPUP
 
-            // BEGIN LOAD POPUP
-            bool p_open_load = true;
+            bool p_open_save_load = true;
 
-            if (ImGui::BeginPopupModal("Load Config", &p_open_load, ImGuiWindowFlags_AlwaysAutoResize)) {
-                bool load = false;
-                static unsigned int cfgLoadSelectedIdx = 0;
+            if (ImGui::BeginPopupModal("Save/Load Config", &p_open_save_load, ImGuiWindowFlags_AlwaysAutoResize)) {
+                static int i                         = 0;
+                static const int FILE_NAME_SIZE      = 128;
+                static char fileName[FILE_NAME_SIZE] = "";
 
-                if (ImGui::BeginListBox("##fileNames")) {
-                    for (unsigned int i = 0; i < cfgFiles.size(); i++) {
-                        count -= 1;
+                int bytesToCopy = 0;
 
-                        const bool selected = (cfgLoadSelectedIdx == i);
+                if (ImGui::BeginListBox("##fileNames", ImVec2(400, 400))) {
+                    for (int j = 0; j < cfg.files.list.size(); j++) {
+                        bool selected = i == j;
 
-                        if (ImGui::Selectable(cfgFiles[i].path().stem().string().c_str(), selected)) {
-                            load = true;
-                            reloadPreview |= true;
-                            cfgLoadSelectedIdx = i;
-                            cfg.load(CFG_PATH_USER, cfgFiles[i].path().stem().string(), CFG_EXTENSION, &cfgLastUsed);
+                        if (ImGui::Selectable(cfg.files.names[j].data(), selected)) {
+                            i = j;
 
-                            regenStars(stars.size());
+                            bytesToCopy = sizeof(char) * std::min(FILE_NAME_SIZE - 1, static_cast<int>(cfg.files.names[i].size()));
 
-                            glfwMakeContextCurrent(NULL);
-                            glfwMakeContextCurrent(win.cfg.glfw);
+                            memcpy(fileName, cfg.files.names[i].data(), bytesToCopy);
+                            fileName[bytesToCopy] = '\0';
                         }
-
                         if (selected) ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndListBox();
                 }
 
-                if (load) ImGui::CloseCurrentPopup();
+                ImGui::Separator();
+
+                ImGui::InputText("Name", fileName, FILE_NAME_SIZE, ImGuiInputTextFlags_CallbackCharFilter, cfgNameImGuiInputTextFilter);
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("Clear")) {
+                    memset(fileName, '\0', 1);
+                }
+
+                ImGui::Separator();
+
+                if (ImGui::Button("Save")) {
+                    ImGui::CloseCurrentPopup();
+                    cfg.save(PATH_USER, fileName, EXT_DEFAULT);
+                }
+
+                if (!cfg.files.list.empty() && i >= 0 && i < cfg.files.list.size()) {
+                    ImGui::SameLine(0.0f, 32.0f);
+
+                    if (ImGui::Button("Load")) {
+                        ImGui::CloseCurrentPopup();
+
+                        cfg.load(PATH_USER, cfg.files.names[i], EXT_DEFAULT);
+
+                        memcpy(fileName, cfg.files.names[i].data(), bytesToCopy);
+                        fileName[bytesToCopy] = '\0';
+
+                        regenStars();
+                        reloadPreview |= true;
+
+                        glfwMakeContextCurrent(NULL);
+                        glfwMakeContextCurrent(win.cfg.glfw);
+                    }
+
+                    ImGui::SameLine(0.0f, 32.0f);
+
+                    if (ImGui::Button("Delete")) {
+                        boost::filesystem::remove(cfg.files.list[i].path());
+                        i = std::max(i - 1, 0);
+                        cfg.files.load(PATH_USER, EXT_DEFAULT);
+                    }
+                }
 
                 ImGui::EndPopup();
             }
-            // END LOAD POPUP
+
+            // END SAVE/LOAD POPUP
 
             ImGui::SameLine();
             if (ImGui::Button("Reset")) {
-                reloadPreview |= true;
-                cfgLastUsed = "RESET";
                 cfg.reset();
 
-                regenStars(stars.size());
+                regenStars();
+                reloadPreview |= true;
 
                 glfwMakeContextCurrent(NULL);
                 glfwMakeContextCurrent(win.cfg.glfw);
             }
 
             ImGui::SameLine();
-            ImGui::LabelText("##configOptions", cfgLastUsed.c_str());
+            ImGui::LabelText("##configOptions", cfg.files.last.data());
 
             ImGui::Separator();
-            ImGui::SliderInt("Target FPS", &cfg.targetFPS, 60, 1000, intFormat, ImGuiSliderFlags_AlwaysClamp);
+            ImGui::DragInt("Target FPS", &cfg.targetFPS, 1000.0f / S, 60, 1000, IF, SF);
 
             displayPreview(displayGenerationParameters() | reloadPreview);
         }
@@ -579,60 +541,67 @@ void createGUI() {
 }
 
 bool displayGenerationParameters() {
-    const char* intFormat = "%d";
-    const char* floatFormat = "%.3f";
-    const double steps = 500.0;
+    static const ImGuiSliderFlags SF = ImGuiSliderFlags_NoRoundToFormat |
+                                       ImGuiSliderFlags_AlwaysClamp;
+    static const char IF[] = "%d";   // int format
+    static const char FF[] = "%.3f"; // float format
+    static const double S  = 1000.0; // steps
+
+    static StarProperties& min  = cfg.min;
+    static StarProperties& max  = cfg.max;
+    static StarProperties& lmin = cfg.limMin;
+    static StarProperties& lmax = cfg.limMax;
 
     bool adjusted = false;
 
     ImGui::Separator();
-    adjusted |= ImGui::DragIntRange2("Tips", &cfg.min.tips, &cfg.max.tips, cfg.limMax.tips / steps, cfg.limMin.tips, cfg.limMax.tips, intFormat, intFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragIntRange2("Tips", &min.tips, &max.tips, lmax.tips / S, lmin.tips, lmax.tips, IF, IF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("x Velocity", &cfg.min.xVel, &cfg.max.xVel, cfg.limMax.xVel / steps, cfg.limMin.xVel, cfg.limMax.xVel, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("x Velocity", &min.xVel, &max.xVel, lmax.xVel / S, lmin.xVel, lmax.xVel, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("y Velocity", &cfg.min.yVel, &cfg.max.yVel, cfg.limMax.yVel / steps, cfg.limMin.yVel, cfg.limMax.yVel, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("y Velocity", &min.yVel, &max.yVel, lmax.yVel / S, lmin.yVel, lmax.yVel, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Angle", &cfg.min.ang, &cfg.max.ang, cfg.limMax.ang / steps, cfg.limMin.ang, cfg.limMax.ang, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Angle", &min.ang, &max.ang, lmax.ang / S, lmin.ang, lmax.ang, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Angular Velocity", &cfg.min.angVel, &cfg.max.angVel, cfg.limMax.angVel / steps, cfg.limMin.angVel, cfg.limMax.angVel, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Angular Velocity", &min.angVel, &max.angVel, lmax.angVel / S, lmin.angVel, lmax.angVel, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Inner Radius", &cfg.min.iRadius, &cfg.max.iRadius, cfg.limMax.iRadius / steps, cfg.limMin.iRadius, cfg.limMax.iRadius, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Inner Radius", &min.iRadius, &max.iRadius, lmax.iRadius / S, lmin.iRadius, lmax.iRadius, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Outer Radius", &cfg.min.oRadius, &cfg.max.oRadius, cfg.limMax.oRadius / steps, cfg.limMin.oRadius, cfg.limMax.oRadius, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Outer Radius", &min.oRadius, &max.oRadius, lmax.oRadius / S, lmin.oRadius, lmax.oRadius, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Density", &cfg.min.density, &cfg.max.density, cfg.limMax.density / steps, cfg.limMin.density, cfg.limMax.density, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Density", &min.density, &max.density, lmax.density / S, lmin.density, lmax.density, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Red", &cfg.min.color.r, &cfg.max.color.r, cfg.limMax.color.r / steps, cfg.limMin.color.r, cfg.limMax.color.r, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Red", &min.color.r, &max.color.r, lmax.color.r / S, lmin.color.r, lmax.color.r, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Green", &cfg.min.color.g, &cfg.max.color.g, cfg.limMax.color.g / steps, cfg.limMin.color.g, cfg.limMax.color.g, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Green", &min.color.g, &max.color.g, lmax.color.g / S, lmin.color.g, lmax.color.g, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Blue", &cfg.min.color.b, &cfg.max.color.b, cfg.limMax.color.b / steps, cfg.limMin.color.b, cfg.limMax.color.b, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Blue", &min.color.b, &max.color.b, lmax.color.b / S, lmin.color.b, lmax.color.b, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::DragFloatRange2("Alpha", &cfg.min.color.a, &cfg.max.color.a, cfg.limMax.color.a / steps, cfg.limMin.color.a, cfg.limMax.color.a, floatFormat, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    adjusted |= ImGui::DragFloatRange2("Alpha", &min.color.a, &max.color.a, lmax.color.a / S, lmin.color.a, lmax.color.a, FF, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::SliderFloat("Min Color", &cfg.minColor, 0.0f, 1.0f, floatFormat, ImGuiSliderFlags_AlwaysClamp);
+    ImGui::DragFloat("Min Color", &cfg.minColor, 1.0f / S, 0.0f, 1.0f, FF, SF);
 
     ImGui::Separator();
-    adjusted |= ImGui::Checkbox("Fill Core", &cfg.style.fillCore);
+    adjusted |= ImGui::Checkbox("Full Core", &cfg.style.core.full);
     ImGui::SameLine();
-    adjusted |= ImGui::Checkbox("Hollow Core", &cfg.style.hollowCore);
+    adjusted |= ImGui::Checkbox("Empty Core", &cfg.style.core.empty);
 
     ImGui::Separator();
-    adjusted |= ImGui::Checkbox("Fill Draw", &cfg.style.fillDraw);
+    adjusted |= ImGui::Checkbox("Fill Draw", &cfg.style.draw.fill);
     ImGui::SameLine();
-    adjusted |= ImGui::Checkbox("Line Draw", &cfg.style.lineDraw);
+    adjusted |= ImGui::Checkbox("Line Draw", &cfg.style.draw.line);
 
     ImGui::Separator();
     adjusted |= ImGui::Checkbox("Force Visible Preview", &cfg.forceVisiblePreview);
@@ -643,9 +612,9 @@ bool displayGenerationParameters() {
 void displayPreview(bool adjusted) {
     // if any settings were changed in the last frame, construct new preview stars so that those settings are applied
     if (adjusted) {
-        pre.min = make_unique<Star>(MIN);
-        pre.avg = make_unique<Star>(AVG);
-        pre.max = make_unique<Star>(MAX);
+        pre.min = std::make_unique<Star>(Enum::Star::GenType::MIN);
+        pre.avg = std::make_unique<Star>(Enum::Star::GenType::AVG);
+        pre.max = std::make_unique<Star>(Enum::Star::GenType::MAX);
 
         if (cfg.forceVisiblePreview) pre.forceVisible();
     }
@@ -694,7 +663,7 @@ void displayPreview(bool adjusted) {
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        DrawableObject::prepareProjection(w, h);
+        Star::prepareProjection(w, h);
 
         // following draws into the frame buffer's data which then gets displayed in ImGui as a texture
         pre.min->draw();
@@ -736,7 +705,7 @@ void createMainWin() {
 
     glfwMakeContextCurrent(win.main.glfw);
     if (!gladLoadGL(glfwGetProcAddress)) {
-        fprintf(stderr, "gladLoadGL(glfwGetProcAddress) failed");
+        std::cerr << "gladLoadGL(glfwGetProcAddress): failed\n";
         exit(1);
     }
 
@@ -757,8 +726,8 @@ void destroyMainWin() {
 
     glfwDestroyWindow(win.main.glfw);
 
-    win.main.glfw = NULL;
-    win.main.imgui = NULL;
+    win.main.glfw   = NULL;
+    win.main.imgui  = NULL;
     win.main.exists = false;
 }
 
@@ -770,7 +739,7 @@ void createCfgWin() {
     // glfwWindowHint(GLFW_SAMPLES, 4);
 
     win.cfg.w = 800;
-    win.cfg.h = 600;
+    win.cfg.h = 800;
     win.cfg.x = win.main.x + win.main.w - win.cfg.w;
     win.cfg.y = win.main.y;
 
@@ -782,7 +751,7 @@ void createCfgWin() {
     glfwMakeContextCurrent(NULL);
     glfwMakeContextCurrent(win.cfg.glfw);
     if (!gladLoadGL(glfwGetProcAddress)) {
-        fprintf(stderr, "gladLoadGL(glfwGetProcAddress) failed");
+        std::cerr << "gladLoadGL(glfwGetProcAddress) failed\n";
         exit(1);
     }
 
@@ -836,7 +805,7 @@ void createCfgWin() {
     ImGui::SetCurrentContext(win.cfg.imgui);
     ImGui::StyleColorsDark();
 
-    win.cfg.io = &ImGui::GetIO();
+    win.cfg.io              = &ImGui::GetIO();
     win.cfg.io->IniFilename = NULL; // disable useless (for this window) ImGui ini file
     // win.cfg.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     // win.cfg.io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
@@ -844,9 +813,9 @@ void createCfgWin() {
     ImGui_ImplGlfw_InitForOpenGL(win.cfg.glfw, false); // second param == false --> do not auto install callbacks because they are already defined above
     ImGui_ImplOpenGL3_Init(GLSL_VER);
 
-    pre.min = make_unique<Star>(MIN);
-    pre.avg = make_unique<Star>(AVG);
-    pre.max = make_unique<Star>(MAX);
+    pre.min = std::make_unique<Star>(Enum::Star::GenType::MIN);
+    pre.avg = std::make_unique<Star>(Enum::Star::GenType::AVG);
+    pre.max = std::make_unique<Star>(Enum::Star::GenType::MAX);
 
     if (cfg.forceVisiblePreview) pre.forceVisible();
 
@@ -873,8 +842,8 @@ void destroyCfgWin() {
     pre.avg.reset();
     pre.max.reset();
 
-    win.cfg.glfw = NULL;
-    win.cfg.imgui = NULL;
+    win.cfg.glfw   = NULL;
+    win.cfg.imgui  = NULL;
     win.cfg.exists = false;
 
     if (win.main.exists) glfwFocusWindow(win.main.glfw);
@@ -899,53 +868,58 @@ void clearWin(GLFWwindow* window) {
 }
 
 void setMainWinTitle() {
-    // old title
-    // glfwSetWindowTitle(win.main.glfw,
-    //                    (to_string(stars.size()) + " stars; " +
-    //                     to_string(1.0 / frameTime) + " FPS; " +
-    //                     to_string(frameTime) + " frameTime")
-    //                        .c_str());
+    int r = mainWinTitle.countR;
+    int v = stars.size();
 
-    // note: mingw64 with C++17 currently doesn't support floating point types for to_chars so the title uses integer types instead
-
-    int i = 0;
-
-    for (int j = i + mainWinTitleSpace; i < j; i++) {
-        mainWinTitle[i] = ' ';
+    // r should never be less than countL here if v is never more than 4 digits
+    for (; v > 0; r--) {
+        mainWinTitle.data[r] = v % 10 + '0';
+        v /= 10;
+    }
+    for (; r >= mainWinTitle.countL; r--) {
+        mainWinTitle.data[r] = ' ';
     }
 
-    to_chars(mainWinTitle,
-             mainWinTitle + mainWinTitleSpace * sizeof(char), stars.size());
+    r = mainWinTitle.fpsR;
+    v = ceil(1.0 / frameTime);
 
-    i += 8;
-
-    for (int j = i + mainWinTitleSpace; i < j; i++) {
-        mainWinTitle[i] = ' ';
+    // r should never be less than fpsL here if v is never more than 4 digits
+    for (; v > 0; r--) {
+        mainWinTitle.data[r] = v % 10 + '0';
+        v /= 10;
+    }
+    for (; r >= mainWinTitle.fpsL; r--) {
+        mainWinTitle.data[r] = ' ';
     }
 
-    to_chars(mainWinTitle + (i - mainWinTitleSpace) * sizeof(char),
-             mainWinTitle + i * sizeof(char), (unsigned int)(ceil(1.0 / frameTime)));
-
-    glfwSetWindowTitle(win.main.glfw, mainWinTitle);
+    glfwSetWindowTitle(win.main.glfw, mainWinTitle.data);
 }
 
 // GLFW callbacks
 
 static void errorCallback(int error, const char* description) {
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+    std::cerr << "GLFW error " << error << ": " << description << '\n';
 }
 
 void mainWinKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_A && action == GLFW_PRESS) {
-        cfg.clear ^= true;
-    } else if (key == GLFW_KEY_S && action == GLFW_PRESS) {
-        clearWin(win.main.glfw);
-    } else if (key == GLFW_KEY_D && action == GLFW_PRESS) {
-        createDestroyCfgWin();
-    } else if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-        maximizeRestoreWin(window);
-    } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, 1);
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_A:
+                clearWin(win.main.glfw);
+                break;
+            case GLFW_KEY_S:
+                cfg.clear ^= true;
+                break;
+            case GLFW_KEY_D:
+                createDestroyCfgWin();
+                break;
+            case GLFW_KEY_F:
+                maximizeRestoreWin(window);
+                break;
+            case GLFW_KEY_ESCAPE:
+                glfwSetWindowShouldClose(window, 1);
+                break;
+        }
     }
 }
 
@@ -961,19 +935,26 @@ void mainWinSizeCallback(GLFWwindow* window, int w, int h) {
 
 void cfgWinKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (win.cfg.io->WantCaptureKeyboard) {
-        // this exists check might be redundant....
-        if (win.cfg.exists) ImGui_ImplGlfw_KeyCallback(win.cfg.glfw, key, scancode, action, mods);
-    } else {
-        if (key == GLFW_KEY_A && action == GLFW_PRESS) {
-            cfg.clear ^= true;
-        } else if (key == GLFW_KEY_S && action == GLFW_PRESS) {
-            clearWin(win.main.glfw);
-        } else if (key == GLFW_KEY_D && action == GLFW_PRESS) {
-            createDestroyCfgWin();
-        } else if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-            maximizeRestoreWin(window);
-        } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-            destroyCfgWin();
+        if (win.cfg.exists) {
+            ImGui_ImplGlfw_KeyCallback(win.cfg.glfw, key, scancode, action, mods);
+        }
+    } else if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_A:
+                clearWin(win.main.glfw);
+                break;
+            case GLFW_KEY_S:
+                cfg.clear ^= true;
+                break;
+            case GLFW_KEY_D:
+                createDestroyCfgWin();
+                break;
+            case GLFW_KEY_F:
+                maximizeRestoreWin(window);
+                break;
+            case GLFW_KEY_ESCAPE:
+                destroyCfgWin();
+                break;
         }
     }
 }
@@ -993,25 +974,6 @@ void cfgWinCloseCallback(GLFWwindow* window) {
 }
 
 // utility
-
-void getCfgFiles(vector<boost::filesystem::directory_entry> &outNames) {
-    using namespace boost::filesystem;
-
-    try {
-        outNames.clear();
-
-        path p(CFG_PATH_USER);
-
-        if (exists(p) && is_directory(p)) {
-
-            for (directory_entry &f : directory_iterator(p)) {
-                if (f.path().extension() == CFG_EXTENSION) outNames.push_back(f);
-            }
-        }
-    } catch (exception &e) {
-        fprintf(stderr, "EXCEPTION: getCfgFiles(): READ: %s\n", e.what());
-    }
-}
 
 // defines legal characters for the config save file names entered via an ImGui InputText
 int cfgNameImGuiInputTextFilter(ImGuiInputTextCallbackData* data) {

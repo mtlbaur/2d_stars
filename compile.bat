@@ -1,9 +1,8 @@
 if not exist "compiled" mkdir "compiled"
 
-..\..\environments\i686-8.1.0-release-posix-dwarf-rt_v6-rev0\mingw32\bin\g++.exe ^
+..\..\environments\winlibs-x86_64-posix-seh-gcc-12.2.0-llvm-14.0.6-mingw-w64ucrt-10.0.0-r2\mingw64\bin\clang++.exe ^
 source\*.cpp ^
--fdiagnostics-color=always ^
--std=c++17 ^
+-std=c++20 ^
 -Wall ^
 -O3 ^
 ..\..\libraries\imgui-1.87\imgui*.cpp ^
@@ -20,6 +19,6 @@ source\*.cpp ^
 -L..\..\libraries\boost_1_79_0\stage\lib ^
 -lglfw3 ^
 -lgdi32 ^
--lboost_filesystem-mgw8-mt-x32-1_79 ^
--lboost_serialization-mgw8-mt-x32-1_79 ^
+-lboost_filesystem-mgw12-mt-x64-1_79 ^
+-lboost_serialization-mgw12-mt-x64-1_79 ^
 -ocompiled\stars.exe
