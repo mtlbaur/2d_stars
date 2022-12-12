@@ -1,5 +1,6 @@
 #include <iostream>
-#include "Star.h"
+
+#include "star.h"
 
 // must define static class data members in a .cpp file before main otherwise linking fails
 std::vector<Color> Star::RGBColors = Color::getRGBColors();
@@ -325,11 +326,11 @@ bool Star::collision(Star& a, Star& b) {
 
     distance = sqrt(distance); // compute the actual distance now that we know there is a collision
 
-    // defined in OverlapCorrection.h
+    // defined in overlap_correction.h
     overlapCorrection(a.x, a.y, b.x, b.y,
                       a.aRadius + b.aRadius, distance);
 
-    // defined in ElasticCollisionResponse.h
+    // defined in elastic_collision_response.h
     elasticCollisionResponse(a.x, a.y, b.x, b.y,
                              a.xVel, a.yVel, b.xVel, b.yVel,
                              a.mass, b.mass);

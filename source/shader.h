@@ -2,7 +2,8 @@
 #define SHADER_H
 
 #include <iostream>
-#include "Shape.h"
+
+#include "shape.h"
 
 constexpr char vertexSource[] =
     R"(#version 460 core

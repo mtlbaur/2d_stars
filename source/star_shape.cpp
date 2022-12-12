@@ -1,4 +1,4 @@
-#include "StarShape.h"
+#include "star_shape.h"
 
 StarShape::StarShape(int& tips, double& iRadius, double& oRadius)
     : tips(tips), iRadius(iRadius), oRadius(oRadius) {

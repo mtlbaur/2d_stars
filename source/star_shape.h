@@ -1,11 +1,11 @@
-#ifndef STARSHAPE_H
-#define STARSHAPE_H
+#ifndef STAR_SHAPE_H
+#define STAR_SHAPE_H
 
 #include "rng.h"
 #include "config.h"
 #include "constants.h"
 #include "enums.h"
-#include "Shape.h"
+#include "shape.h"
 
 extern struct RNG rng;
 extern struct Config cfg;

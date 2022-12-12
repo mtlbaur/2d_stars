@@ -1,12 +1,12 @@
-#ifndef OVERLAPCORRECTION_H
-#define OVERLAPCORRECTION_H
+#ifndef OVERLAP_CORRECTION_H
+#define OVERLAP_CORRECTION_H
 
 #include <cmath>
 
 /*
 Circle-circle overlap correction.
 
-The elastic collision response code (found in ElasticCollisionResponse.h) used in this program does not handle overlapping star collision circles. Since, in many collisions, stars end up overlapping to some degree, we have to correct that overlap somehow before we compute the collision response. The method used here takes the overlap distance ("overlap"), divides it by 2, and displaces each star away from each other by that distance.
+The elastic collision response code (found in elastic_collision_response.h) used in this program does not handle overlapping star collision circles. Since, in many collisions, stars end up overlapping to some degree, we have to correct that overlap somehow before we compute the collision response. The method used here takes the overlap distance ("overlap"), divides it by 2, and displaces each star away from each other by that distance.
 
 This is possible by considering the vector from one colliding star's center to the other ("collision vector"), scaling that vector down to the magnitude of half the overlap, and then adding that vector to the x, y position of one star and substracting from the other.
 

@@ -1,6 +1,6 @@
 2d_stars is licensed under the MIT license **with the following exception(s)**:
 
-1. The code within the `elasticCollisionResponse` function located in the [ElasticCollisionResponse.h](source/ElasticCollisionResponse.h) source file.
+1. The code within the `elasticCollisionResponse` function located in the [elastic_collision_response.h](source/elastic_collision_response.h) source file.
 
 	The code within this function is an adaptation of the "angle-free representation" versions of the circle-circle elastic collision response formulas found in the [Wikipedia article entitled "Elastic collision"](https://en.wikipedia.org/wiki/Elastic_collision#Two-dimensional_collision_with_two_moving_objects). The text within this Wikipedia article is licensed under [Creative Commons Attribution-ShareAlike License 3.0](https://creativecommons.org/licenses/by-sa/3.0/). One requirement listed by the "human-readable summary" of this license states:
 

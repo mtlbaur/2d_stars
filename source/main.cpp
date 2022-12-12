@@ -16,7 +16,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Star.h"
+#include "star.h"
 
 const int SCREEN_SIZE_X       = 1920;
 const int SCREEN_SIZE_Y       = 1080;

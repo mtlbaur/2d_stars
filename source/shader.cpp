@@ -1,4 +1,4 @@
-#include "Shader.h"
+#include "shader.h"
 
 Shader::Shader(Shape& s) {
     glGenBuffers(1, &vertexBuffer);

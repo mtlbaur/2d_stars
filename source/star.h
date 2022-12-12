@@ -16,10 +16,10 @@
 #include "enums.h"
 #include "window.h"
 #include "config.h"
-#include "Shader.h"
-#include "StarShape.h"
-#include "OverlapCorrection.h"
-#include "ElasticCollisionResponse.h"
+#include "shader.h"
+#include "star_shape.h"
+#include "overlap_correction.h"
+#include "elastic_collision_response.h"
 
 extern struct RNG rng;
 extern struct Config cfg;
