@@ -1,5 +1,5 @@
-#ifndef STAR_SHAPE_H
-#define STAR_SHAPE_H
+#ifndef STAR_SHAPE_H_GUARD
+#define STAR_SHAPE_H_GUARD
 
 #include "rng.h"
 #include "config.h"

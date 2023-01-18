@@ -1,5 +1,5 @@
-#ifndef STAR_H
-#define STAR_H
+#ifndef STAR_H_GUARD
+#define STAR_H_GUARD
 
 #include <random>
 #include <memory>

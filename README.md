@@ -17,9 +17,11 @@
     - `F` toggles fullscreen on focused window
 - most settings/features are toggleable/adjustable
 
+A demo can be found [here](https://youtu.be/9rjavv0yBGI).
+
 ***
 
-This program was written with tools from the compiler environment provided by [WinLibs](https://winlibs.com/) (specifically: `clang++`/`g++` for `C++20`, `gdb`,  `clang-format`, and `clang-tidy`), the [VSCode](https://code.visualstudio.com/) editor, and the [C/C++ VSCode extension](https://github.com/Microsoft/vscode-cpptools). 
+This program was written with tools from the compiler environment provided by [WinLibs](https://winlibs.com/) (specifically: `clang++`/`g++` for `C++20`, `gdb`,  `clang-format`, and `clang-tidy`), the [VSCode](https://code.visualstudio.com/) editor, and the [C/C++ VSCode extension](https://github.com/Microsoft/vscode-cpptools).
 
 The following libraries were used:
 - [OpenGL 4.6](https://www.opengl.org/) for graphics.
@@ -43,21 +45,30 @@ Example environment setup for Windows 10:
 - download `GCC 12.2.0 + LLVM/Clang/LLD/LLDB 14.0.6 + MinGW-w64 10.0.0 (UCRT) - release 2` for `Win64` from [WinLibs](https://winlibs.com/)
 - download and [compile GLFW 3.3.2](https://www.glfw.org/docs/3.3/compile.html)
     - short instructions (will need [cmake](https://cmake.org/download/)):
-        - `cd GLFW_ROOT` (where `GLFW_ROOT` is the GLFW directory containing CMakeLists.txt, should be the toplevel of the GLFW folder)
-        - `mkdir build`
-        - `cd build`
-        - `cmake -G "MinGW Makefiles" -S GLFW_ROOT` (`-G` specify generator, must match MinGW; `-S` path to `GLFW_ROOT` with CMakeLists.txt as before)
-        - `mingw32-make`
+        -   ```ps1
+            # `GLFW_ROOT` is the top level GLFW directory containing CMakeLists.txt
+            cd GLFW_ROOT
+            mkdir build
+            cd build
+            # `-G` specify generator, must match MinGW
+            # `-S` path to `GLFW_ROOT` with CMakeLists.txt as before
+            cmake -G "MinGW Makefiles" -S GLFW_ROOT
+            mingw32-make
+            ```
         - `GLFW_ROOT\build\src` contains the compiled library
 - generate `Glad 2` in core configuration for `OpenGL 4.6` and download
 - download `GLM 0.9.9.8`
 - download `Dear ImGui 1.87`
 - download and [compile Boost 1.79.0](https://www.boost.org/doc/libs/1_79_0/more/getting_started/windows.html#prepare-to-use-a-boost-library-binary)
     - short instructions (this will compile every library which takes a fairly long time):
-        - `cd BOOST_ROOT\tools\build`
-        - `bootstrap.bat gcc` (`gcc` so we can take advantage of the already installed MinGW)
-        - `cd BOOST_ROOT`
-        - `BOOST_ROOT\tools\build\b2 toolset=gcc` (use the newly built `tools\build\b2.exe` to build the Boost libraries)
+        -   ```ps1
+            cd BOOST_ROOT\tools\build
+            # `gcc` so we can take advantage of the already installed MinGW
+            bootstrap.bat gcc
+            cd BOOST_ROOT
+            # use the newly built `tools\build\b2.exe` to build the Boost libraries
+            BOOST_ROOT\tools\build\b2 toolset=gcc
+            ```
         - `BOOST_ROOT\stage\lib` contains the compiled libraries
     - find `libboost_filesystem-mgw12-mt-x64-1_79.dll` and `libboost_serialization-mgw12-mt-x64-1_79.dll` in `BOOST_ROOT\stage\lib` and copy them into a folder entitled `compiled` located the same directory as the `source` folder
         - these DLLs are necessary for the compiled executable to run (unless you statically link), if you don't do this step, you will get "DLL not found" errors

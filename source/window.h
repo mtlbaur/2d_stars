@@ -1,5 +1,5 @@
-#ifndef WINDOW_H
-#define WINDOW_H
+#ifndef WINDOW_H_GUARD
+#define WINDOW_H_GUARD
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>

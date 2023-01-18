@@ -5,6 +5,8 @@
 
 !source
 
+!cmake_setup.ps1
+!cmakelists.txt
 !compile.bat
 
 !README.md

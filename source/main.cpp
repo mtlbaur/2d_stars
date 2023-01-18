@@ -762,7 +762,7 @@ void createCfgWin() {
 
     // clang-format off
     // This texture is used for the preview window.
-    // ImGui needs requires a texture to be able to add a custom image to an ImGui window, so that's what is being created here.
+    // ImGui requires a texture to be able to add a custom image to an ImGui window, so that's what is being created here.
     glBindTexture(GL_TEXTURE_2D, win.cfg.texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, win.cfg.w, win.cfg.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

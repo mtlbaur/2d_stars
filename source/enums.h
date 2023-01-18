@@ -1,5 +1,5 @@
-#ifndef ENUMS_H
-#define ENUMS_H
+#ifndef ENUMS_H_GUARD
+#define ENUMS_H_GUARD
 
 namespace Enum {
     namespace Star {

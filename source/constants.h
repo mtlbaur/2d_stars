@@ -1,5 +1,5 @@
-#ifndef CONSTANTS_H
-#define CONSTANTS_H
+#ifndef CONSTANTS_H_GUARD
+#define CONSTANTS_H_GUARD
 
 #include <glm/gtc/constants.hpp>
 

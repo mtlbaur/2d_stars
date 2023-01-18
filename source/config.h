@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef CONFIG_H_GUARD
+#define CONFIG_H_GUARD
 
 #include <fstream>
 #include <iostream>

@@ -1,5 +1,5 @@
-#ifndef RNG_H
-#define RNG_H
+#ifndef RNG_H_GUARD
+#define RNG_H_GUARD
 
 #include <chrono>
 #include <random>

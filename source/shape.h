@@ -1,5 +1,5 @@
-#ifndef SHAPE_H
-#define SHAPE_H
+#ifndef SHAPE_H_GUARD
+#define SHAPE_H_GUARD
 
 #include <memory>
 
